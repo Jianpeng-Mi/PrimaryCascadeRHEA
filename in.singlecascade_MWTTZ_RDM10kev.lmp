@@ -1,0 +1,74 @@
+# LAMMPS script for primary cascade simulation in HEA at 300 K
+# Variables
+variable T_rad equal 300
+variable P equal 0.0
+variable border_thickness equal 5.57  # Border thickness for Berendsen thermostat (4 atom layers)
+
+# Initialize the simulation
+units metal
+dimension 3
+boundary p p p
+atom_style atomic
+
+# Create the simulation box and atoms
+read_data MWTTZ60^3-RDM300.data
+
+# Define the interatomic potential
+pair_style eam/alloy
+pair_coeff * * MoWTaTiZr.zbl.eam.alloy Mo W Ta Ti Zr
+
+# Define masses (update for each atom type in the HEA)
+mass 1 95.95     # Mo
+mass 2 183.84    # W
+mass 3 180.9     # Ta
+mass 4 47.88     # Ti
+mass 5 91.22     # Zr
+
+# Neighbor settings
+neighbor 2.0 bin
+neigh_modify every 1 delay 0 check yes
+
+# Define the border region for Berendsen thermostat
+variable lx_val equal lx
+variable ly_val equal ly
+variable lz_val equal lz
+variable x1_core equal ${border_thickness}
+variable x2_core equal ${lx_val}-${border_thickness}
+variable y1_core equal ${border_thickness}
+variable y2_core equal ${ly_val}-${border_thickness}
+variable z1_core equal ${border_thickness}
+variable z2_core equal ${lz_val}-${border_thickness}
+region core block ${x1_core} ${x2_core} ${y1_core} ${y2_core} ${z1_core} ${z2_core} units box
+region border block ${x1_core} ${x2_core} ${y1_core} ${y2_core} ${z1_core} ${z2_core} units box side out
+group  core region core
+group  border region border
+
+fix 2 border temp/berendsen ${T_rad} ${T_rad} 0.1
+fix 1 core nve
+
+# Thermodynamic output
+thermo 100
+thermo_style custom step temp etotal pe time
+
+# Select a center Ta atom as PKA
+group pka id 378002
+
+# Define PKA parameters for Ta atom
+variable kinetic_energy equal 10.0e3  # EPKA in eV
+variable mass_Ta equal 180.9  # Mass of Ta in amu
+variable v equal sqrt(2*${kinetic_energy}*1.602e-19/(${mass_Ta}*1.66e-27))*1e10/1e12
+variable vx equal ${v}*1/sqrt(35)
+variable vy equal ${v}*3/sqrt(35)
+variable vz equal ${v}*5/sqrt(35)
+velocity pka set ${vx} ${vy} ${vz} sum yes units box
+
+# Output calculated velocity
+print "Calculated velocity: ${v} ang/ps"
+
+# Adaptive timestep control
+timestep 0.001
+fix 3 all dt/reset 1 1.0e-7 1.0e-3 0.02 units box
+
+# Run primary cascade simulation
+dump 1 all custom 100 cascade_MWTTZRDM_10kev2.dump id type x y z vx vy vz 
+run 120000
