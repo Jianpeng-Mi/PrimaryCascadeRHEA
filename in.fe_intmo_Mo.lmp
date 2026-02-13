@@ -1,0 +1,69 @@
+variable i loop 10000
+
+label loop
+
+clear
+variable randomseed equal 365987
+
+units 		metal
+dimension	3
+boundary	p p p      
+atom_style	atomic
+
+read_data MWTTZ30^3-ORD300.data
+
+mass 1 95.94     # Mo
+mass 2 183.84    # W
+mass 3 180.9479  # Ta
+mass 4 47.88     # Ti
+mass 5 91.224    # Zr
+
+pair_style	eam/alloy
+pair_coeff * * MoWTaTiZr.zbl.eam.alloy Mo W Ta Ti Zr
+
+compute eng all pe/atom 
+compute eatoms all reduce sum c_eng
+run 0
+
+thermo 10
+thermo_style custom step temp pe lx ly lz press pxx pyy pzz c_eatoms
+
+reset_timestep 0
+min_style cg
+minimize 1e-15 1e-15 5000 5000
+
+variable length equal "lx"
+variable a equal v_length/30
+
+variable N equal count(all)
+variable No equal $N
+variable E equal "c_eatoms"
+variable Eo equal $E
+
+variable i2 equal $i
+variable rdm1 equal v_randomseed+v_i2+101
+variable rdm2 equal v_randomseed+v_i2+102
+variable rdm3 equal v_randomseed+v_i2+103
+variable x equal random(0,30,${rdm1})
+variable y equal random(0,30,${rdm2})
+variable z equal random(0,30,${rdm3})
+
+lattice bcc ${a}
+create_atoms 1 single $x $y $z units lattice
+
+reset_timestep 0
+min_style cg
+minimize 1e-15 1e-15 5000 5000
+
+variable Ef equal "c_eatoms"
+variable Ei equal (${Ef}-((${No}+1)/${No})*${Eo})
+
+print "------------------------------------------------------------"
+print "Total number of atoms = ${No}"
+print "Initial energy of atoms = ${Eo}"
+print "Final energy of atoms = ${Ef}"
+print "Interstitial formation energy = ${Ei}"
+print "------------------------------------------------------------"
+
+next i
+jump SELF loop
