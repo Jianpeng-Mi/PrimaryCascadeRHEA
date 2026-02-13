@@ -55,10 +55,10 @@ thermo 10
 thermo_style custom step pe lx ly lz press pxx pyy pzz
 
 # Minimization
-fix 1 all box/relax iso 0.0 vmax 0.001
+# fix 1 all box/relax iso 0.0 vmax 0.001
 min_style cg
 minimize 1e-25 1e-25 10000 10000
-unfix 1
+# unfix 1
 
 thermo 1000
 thermo_style custom step temp pe ke etotal
@@ -118,3 +118,4 @@ next i
 jump SELF loop_MCMD
 
 write_data MWTTZ50^3-ORD300.data
+
