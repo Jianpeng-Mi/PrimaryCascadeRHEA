@@ -1,0 +1,120 @@
+# LAMMPS input script for Mo72W13Ta10Ti2.5Zr2.5 high entropy alloy
+# Define variables
+variable a equal 3.1766
+variable xdim equal 50
+variable ydim equal 50
+variable zdim equal 50
+variable T_relax equal 300
+variable T_anneal equal 300
+variable P equal 0.0
+variable nsteps_relax equal 50000
+variable nsteps_MCMD equal 1000
+variable randomseed equal 12345
+variable swap_attempts equal 100
+variable mc_freq equal 100
+
+# Initialize simulation
+units metal
+dimension 3
+boundary p p p
+atom_style atomic
+
+# Create BCC lattice
+lattice bcc ${a}
+region box block 0 ${xdim} 0 ${ydim} 0 ${zdim}
+create_box 5 box
+create_atoms 1 box
+
+# Define masses
+mass 1 95.94     # Mo
+mass 2 183.84    # W
+mass 3 180.9479  # Ta
+mass 4 47.88     # Ti
+mass 5 91.224    # Zr
+
+# Set total number of atoms and calculate number of each type
+variable natoms equal count(all)
+variable nMo equal round(${natoms}*0.72)
+variable nW equal round(${natoms}*0.13)
+variable nTa equal round(${natoms}*0.10)
+variable nTi equal round(${natoms}*0.025)
+variable nZr equal round(${natoms}*0.025)
+
+# Assign atom types randomly
+set type 1 type/fraction 2 $(v_nW/v_natoms) $(v_randomseed+1)
+set type 1 type/fraction 3 $(v_nTa/(v_natoms-v_nW)) $(v_randomseed+2)
+set type 1 type/fraction 4 $(v_nTi/(v_natoms-v_nW-v_nTa)) $(v_randomseed+3)
+set type 1 type/fraction 5 $(v_nZr/(v_natoms-v_nW-v_nTa-v_nTi)) $(v_randomseed+4)
+
+# EAM potential
+pair_style eam/alloy
+pair_coeff * * MoWTaTiZr.zbl.eam.alloy Mo W Ta Ti Zr
+
+# thermodynamic output
+thermo 10
+thermo_style custom step pe lx ly lz press pxx pyy pzz
+
+# Minimization
+fix 1 all box/relax iso 0.0 vmax 0.001
+min_style cg
+minimize 1e-25 1e-25 10000 10000
+unfix 1
+
+thermo 1000
+thermo_style custom step temp pe ke etotal
+
+# Equilibration
+velocity all create ${T_relax} 12345 mom yes rot no
+fix 1 all npt temp ${T_relax} ${T_relax} 0.1 iso ${P} ${P} 1.0 drag 1.0
+run ${nsteps_relax}
+unfix 1
+
+write_data MWTTZ50^3-RDM300.data
+
+reset_timestep 0
+
+# Print the real-time potential energy
+fix 12 all print 100 "$(step) $(temp) $(pe) $(ke) $(etotal)" file ./Annealrecord_MWTTZ_50^3.dat screen no
+
+thermo 100
+thermo_style custom step temp pe ke etotal
+
+# Perform Monte Carlo swaps
+fix 1 all npt temp ${T_anneal} ${T_anneal} 0.1 iso ${P} ${P} 1.0 drag 1.0
+label loop_MCMD
+variable i loop 750
+fix 2 all atom/swap ${mc_freq} ${swap_attempts} $(v_randomseed+101) ${T_anneal} types 1 2
+run ${nsteps_MCMD}
+unfix 2
+fix 3 all atom/swap ${mc_freq} ${swap_attempts} $(v_randomseed+102) ${T_anneal} types 1 3
+run ${nsteps_MCMD}
+unfix 3
+fix 4 all atom/swap ${mc_freq} ${swap_attempts} $(v_randomseed+103) ${T_anneal} types 1 4
+run ${nsteps_MCMD}
+unfix 4
+fix 5 all atom/swap ${mc_freq} ${swap_attempts} $(v_randomseed+104) ${T_anneal} types 1 5
+run ${nsteps_MCMD}
+unfix 5
+fix 6 all atom/swap ${mc_freq} ${swap_attempts} $(v_randomseed+105) ${T_anneal} types 2 3
+run ${nsteps_MCMD}
+unfix 6
+fix 7 all atom/swap ${mc_freq} ${swap_attempts} $(v_randomseed+106) ${T_anneal} types 2 4
+run ${nsteps_MCMD}
+unfix 7
+fix 8 all atom/swap ${mc_freq} ${swap_attempts} $(v_randomseed+107) ${T_anneal} types 2 5
+run ${nsteps_MCMD}
+unfix 8
+fix 9 all atom/swap ${mc_freq} ${swap_attempts} $(v_randomseed+108) ${T_anneal} types 3 4
+run ${nsteps_MCMD}
+unfix 9
+fix 10 all atom/swap ${mc_freq} ${swap_attempts} $(v_randomseed+109) ${T_anneal} types 3 5
+run ${nsteps_MCMD}
+unfix 10
+fix 11 all atom/swap ${mc_freq} ${swap_attempts} $(v_randomseed+110) ${T_anneal} types 4 5
+run ${nsteps_MCMD}
+unfix 11
+
+next i
+jump SELF loop_MCMD
+
+write_data MWTTZ50^3-ORD300.data
