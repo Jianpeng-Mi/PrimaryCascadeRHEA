@@ -1,0 +1,40 @@
+# NEB for interstitial in MoWTaTiZr
+units           metal
+
+atom_style      atomic
+atom_modify     map array
+boundary        p p p
+atom_modify     sort 0 0.0
+
+read_data       MWTTZ30^3-ORD300.data
+
+# make a interstitial
+
+variable a equal lx/30
+lattice bcc $a
+variable x equal ${vx}
+variable y equal ${vy}
+variable z equal ${vz}
+variable sort equal ${num}
+create_atoms ${sort} single $x $y $z units box
+
+# choose potential
+
+pair_style    eam/alloy
+pair_coeff * * MoWTaTiZr.zbl.eam.alloy Mo W Ta Ti Zr
+
+# set up neb run
+
+min_style cg
+minimize 1e-15 1e-15 5000 5000
+
+reset_timestep  0
+
+fix             1 all neb 1.0
+
+thermo          100
+
+timestep        0.01
+min_style       quickmin
+
+neb             0.0 0.005 10000 10000 10 final ${final}
