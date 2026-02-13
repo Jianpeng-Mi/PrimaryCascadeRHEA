@@ -1,0 +1,45 @@
+units           metal
+
+atom_style      atomic
+atom_modify     map array
+boundary        p p p
+atom_modify     sort 0 0.0
+
+read_data       MWTTZ30^3-ORD300.data
+
+# make a vacancy
+
+variable target equal ${id}
+group del id ${target}
+delete_atoms group del compress no
+
+# choose potential
+
+pair_style	eam/alloy
+pair_coeff * * MoWTaTiZr.zbl.eam.alloy Mo W Ta Ti Zr
+
+# set up neb run
+
+# variable        u uloop 20
+
+# initial minimization to relax vacancy
+
+min_style cg
+minimize        1.0e-15 1.0e-15 5000 10000
+
+reset_timestep  0
+
+# only output atoms near vacancy
+
+#dump events vacneigh custom 1000 dump.neb.sivac.$u id type x y z
+
+fix             1 all neb 1.0
+
+thermo          100
+
+# run NEB for 2000 steps or to force tolerance
+
+timestep        0.01
+min_style       quickmin
+
+neb             0.0 0.005 10000 10000 10 final ${final}
